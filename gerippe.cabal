@@ -17,6 +17,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     Database.Gerippe
                      , Database.Gerippe.Utils
+                     , Database.Gerippe.Persist
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , esqueleto
