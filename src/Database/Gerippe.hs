@@ -92,7 +92,7 @@ type EntEq a = (PersistEntity a, PersistEntityBackend a ~ SqlBackend)
 type EntEqs a b = (EntEq a, EntEq b)
 
 -- | join a one-to-many relationship and get all entities
--- in a map
+-- where the second field is collected as list of values in a map
 -- @
 --   personMap <- join1ToM PersonId BlogPostAuthorId
 --   liftIO . print $ Map.lookup johnDoe personMap
@@ -121,7 +121,7 @@ join1ToM' idField fkField =
         pure (t1, t2)
 
 -- | join a many-to-one relationship and get all entities
--- in a map
+-- as keys and values in a map
 -- @
 --   blogPostMap <- joinMTo1 BlogPostAuthorId PersonId
 --   liftIO . print $ Map.lookup blogpost1 blogPostMap -- johnDoe
@@ -144,7 +144,7 @@ joinMTo1' fkField idField =
         pure (t1, t2)
 
 -- | join a many-to-one relationship and query with where-clause
--- in a map
+-- where the second field is collected as list of values in a map
 -- @
 --   blogPostMap <- joinMTo1Where BlogPostAuthorId
 --                                PersonId
@@ -171,7 +171,19 @@ joinMTo1Where' fkField idField field value =
         on     $ t1 ^. fkField ==. t2 ^. idField
         where_ $ t1 ^. field   ==. val value
         pure (t1, t2)
+  
+-- | join a many-to-many relationship
+-- where the second field is collected as list of values in a map
+joinMToM :: (EntEq a, EntEq b, EntEq c, MonadIO m, Ord a)
+         => EntityField a (Key a)
+         -> EntityField c (Key a)
+         -> EntityField c (Key b)
+         -> EntityField b (Key b)
+         -> SqlPersistT m (Map (Entity a) [Entity b])
+joinMToM idField1 fkField1 fkField2 idField2 =
+    collectSnd <$> joinMToM' idField1 fkField1 fkField2 idField2
 
+-- | join a many-to-many relationship
 joinMToM' :: (EntEq a, EntEq b, EntEq c, MonadIO m)
           => EntityField a (Key a)
           -> EntityField c (Key a)
@@ -183,13 +195,3 @@ joinMToM' idField1 fkField1 fkField2 idField2 =
         on $ t2 ^. idField2 ==. m2m ^. fkField2
         on $ m2m ^. fkField1 ==. t1 ^. idField1
         pure (t1, t2)
-  
-joinMToM :: (EntEq a, EntEq b, EntEq c, MonadIO m, Ord a)
-          => EntityField a (Key a)
-          -> EntityField c (Key a)
-          -> EntityField c (Key b)
-          -> EntityField b (Key b)
-          -> SqlPersistT m (Map (Entity a) (Entity b))
-joinMToM idField1 fkField1 fkField2 idField2 =
-    Map.fromList <$> joinMToM' idField1 fkField1 fkField2 idField2
-    
