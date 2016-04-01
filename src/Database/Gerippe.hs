@@ -85,8 +85,8 @@ getAll = select . from $ pure
 getWhere :: (ToBackEq a,  PersistField b, MonadIO m)
          => EntityField a b -> b -> SqlPersistT m [Entity a]
 getWhere field value = select . from $ \t -> do
-  where_ $ t ^. field ==. val value
-  pure t
+    where_ $ t ^. field ==. val value
+    pure t
 
 type EntEq a = (PersistEntity a, PersistEntityBackend a ~ SqlBackend)
 type EntEqs a b = (EntEq a, EntEq b)
@@ -116,9 +116,9 @@ join1ToM' :: (EntEqs a b, MonadIO m)
           -> EntityField b (Key a)
           -> SqlPersistT m [(Entity a, Entity b)]
 join1ToM' idField fkField =
-  select . from $ \(t1 `InnerJoin` t2) -> do
-    on (t1 ^. idField ==. t2 ^. fkField)
-    pure (t1, t2)
+    select . from $ \(t1 `InnerJoin` t2) -> do
+        on (t1 ^. idField ==. t2 ^. fkField)
+        pure (t1, t2)
 
 -- | join a many-to-one relationship and get all entities
 -- in a map
@@ -139,9 +139,9 @@ joinMTo1' :: (EntEqs a b, MonadIO m)
           -> EntityField b (Key b)
           -> SqlPersistT m [(Entity a, Entity b)]
 joinMTo1' fkField idField =
-  select . from $ \(t1 `InnerJoin` t2) -> do
-    on (t1 ^. fkField ==. t2 ^. idField)
-    pure (t1, t2)
+    select . from $ \(t1 `InnerJoin` t2) -> do
+        on (t1 ^. fkField ==. t2 ^. idField)
+        pure (t1, t2)
 
 -- | join a many-to-one relationship and query with where-clause
 -- in a map
@@ -167,7 +167,29 @@ joinMTo1Where' :: (EntEqs a b, PersistField c, MonadIO m)
                -> c
                -> SqlPersistT m [(Entity a, Entity b)]
 joinMTo1Where' fkField idField field value =
-  select . from $ \(t1 `InnerJoin` t2) -> do
-    on     $ t1 ^. fkField ==. t2 ^. idField
-    where_ $ t1 ^. field   ==. val value
-    pure (t1, t2)
+    select . from $ \(t1 `InnerJoin` t2) -> do
+        on     $ t1 ^. fkField ==. t2 ^. idField
+        where_ $ t1 ^. field   ==. val value
+        pure (t1, t2)
+
+joinMToM' :: (EntEq a, EntEq b, EntEq c, MonadIO m)
+          => EntityField a (Key a)
+          -> EntityField c (Key a)
+          -> EntityField c (Key b)
+          -> EntityField b (Key b)
+          -> SqlPersistT m [(Entity a, Entity b)]
+joinMToM' idField1 fkField1 fkField2 idField2 =
+    select . from $ \(t1 `InnerJoin` m2m `InnerJoin` t2) -> do
+        on $ t2 ^. idField2 ==. m2m ^. fkField2
+        on $ m2m ^. fkField1 ==. t1 ^. idField1
+        pure (t1, t2)
+  
+joinMToM :: (EntEq a, EntEq b, EntEq c, MonadIO m, Ord a)
+          => EntityField a (Key a)
+          -> EntityField c (Key a)
+          -> EntityField c (Key b)
+          -> EntityField b (Key b)
+          -> SqlPersistT m (Map (Entity a) (Entity b))
+joinMToM idField1 fkField1 fkField2 idField2 =
+    Map.fromList <$> joinMToM' idField1 fkField1 fkField2 idField2
+    
