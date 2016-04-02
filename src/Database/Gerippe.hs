@@ -143,7 +143,8 @@ joinMTo1' fkField idField =
         on (t1 ^. fkField ==. t2 ^. idField)
         pure (t1, t2)
 
--- | join a many-to-one relationship and query with where-clause
+-- | join a many-to-one relationship and query
+-- where the first field is restricted by a where-clause
 -- where the second field is collected as list of values in a map
 -- @
 --   blogPostMap <- joinMTo1Where BlogPostAuthorId
@@ -194,4 +195,34 @@ joinMToM' idField1 fkField1 fkField2 idField2 =
     select . from $ \(t1 `InnerJoin` m2m `InnerJoin` t2) -> do
         on $ t2 ^. idField2 ==. m2m ^. fkField2
         on $ m2m ^. fkField1 ==. t1 ^. idField1
+        pure (t1, t2)
+
+-- | join a many-to-many relationship
+-- where the first field is restricted by a where-clause
+joinMToMWhere :: (EntEq a, EntEq b, EntEq c, PersistField d, MonadIO m, Ord a)
+          => EntityField a (Key a)
+          -> EntityField c (Key a)
+          -> EntityField c (Key b)
+          -> EntityField b (Key b)
+          -> EntityField a d
+          -> d
+          -> SqlPersistT m (Map (Entity a) [Entity b])
+joinMToMWhere idField1 fkField1 fkField2 idField2 field value =
+    collectSnd <$> joinMToMWhere' idField1 fkField1 fkField2 idField2 field value
+
+-- | join a many-to-many relationship
+-- where the first field is restricted by a where-clause
+joinMToMWhere' :: (EntEq a, EntEq b, EntEq c, PersistField d, MonadIO m)
+          => EntityField a (Key a)
+          -> EntityField c (Key a)
+          -> EntityField c (Key b)
+          -> EntityField b (Key b)
+          -> EntityField a d
+          -> d
+          -> SqlPersistT m [(Entity a, Entity b)]
+joinMToMWhere' idField1 fkField1 fkField2 idField2 field value =
+    select . from $ \(t1 `InnerJoin` m2m `InnerJoin` t2) -> do
+        on     $ t2 ^. idField2 ==. m2m ^. fkField2
+        on     $ m2m ^. fkField1 ==. t1 ^. idField1
+        where_ $ t1 ^. field ==. val value
         pure (t1, t2)
