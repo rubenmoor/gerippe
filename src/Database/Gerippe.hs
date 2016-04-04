@@ -120,6 +120,34 @@ join1ToM' idField fkField =
         on (t1 ^. idField ==. t2 ^. fkField)
         pure (t1, t2)
 
+-- | join a one-to-many relationship and get all entities
+-- where the first field is restricted by a where-clause
+-- and the second field is collected as list of values in a map
+join1ToMWhere :: (EntEqs a b, PersistField c, MonadIO m, Ord a)
+              => EntityField a (Key a)
+              -> EntityField b (Key a)
+              -> EntityField a c
+              -> c
+              -> SqlPersistT m (Map (Entity a) [Entity b])
+join1ToMWhere idField fkField field value =
+    collectSnd <$> join1ToMWhere' idField fkField field value
+
+-- | join a one-to-many relationship and get all entities
+-- @
+--   [(johnDoe, blogpost1), (johnDoe, blogpost2)] -- no map
+-- @
+join1ToMWhere' :: (EntEqs a b, PersistField c, MonadIO m)
+               => EntityField a (Key a)
+               -> EntityField b (Key a)
+               -> EntityField a c
+               -> c
+               -> SqlPersistT m [(Entity a, Entity b)]
+join1ToMWhere' idField fkField field value =
+    select . from $ \(t1 `InnerJoin` t2) -> do
+        on     $ t1 ^. idField ==. t2 ^. fkField
+        where_ $ t1 ^. field ==. val value
+        pure (t1, t2)
+
 -- | join a many-to-one relationship and get all entities
 -- as keys and values in a map
 -- @
@@ -145,7 +173,7 @@ joinMTo1' fkField idField =
 
 -- | join a many-to-one relationship and query
 -- where the first field is restricted by a where-clause
--- where the second field is collected as list of values in a map
+-- as keys and values in a map
 -- @
 --   blogPostMap <- joinMTo1Where BlogPostAuthorId
 --                                PersonId
