@@ -8,15 +8,14 @@ module Database.Gerippe
   , module Database.Gerippe.Utils
   , module Database.Esqueleto
   , delete
-  , update
   ) where
 
 import           Control.Monad.IO.Class (MonadIO)
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 
-import           Database.Esqueleto     hiding (delete, entityId, update)
-import           Database.Persist       (delete, update)
+import           Database.Esqueleto     hiding (delete, entityId)
+import           Database.Persist       (delete)
 
 import           Database.Gerippe.Utils (collectSnd)
 
