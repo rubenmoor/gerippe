@@ -1,19 +1,22 @@
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ConstraintKinds #-}
 
 module Database.Gerippe
   ( module Database.Gerippe
   , module Database.Gerippe.Utils
   , module Database.Esqueleto
+  , delete
+  , update
   ) where
 
 import           Control.Monad.IO.Class (MonadIO)
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 
-import           Database.Esqueleto     hiding (entityId)
+import           Database.Esqueleto     hiding (delete, entityId, update)
+import           Database.Persist       (delete, update)
 
 import           Database.Gerippe.Utils (collectSnd)
 
@@ -36,7 +39,7 @@ import           Database.Gerippe.Utils (collectSnd)
 -- -- run queries, e.g. on an sqlite database
 -- runSqlite ":memory:" $ do
 --   runMigration migrateAll
--- 
+--
 --   johnKey <- insert $ Person "John Doe" $ Just 35
 --   _       <- insert $ Person "Jane Doe" Nothing
 --
@@ -200,7 +203,7 @@ joinMTo1Where' fkField idField field value =
         on     $ t1 ^. fkField ==. t2 ^. idField
         where_ $ t1 ^. field   ==. val value
         pure (t1, t2)
-  
+
 -- | join a many-to-many relationship
 -- where the second field is collected as list of values in a map
 joinMToM :: (EntEq a, EntEq b, EntEq c, MonadIO m, Ord a)
