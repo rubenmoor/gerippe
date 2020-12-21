@@ -1,1 +1,7 @@
 /dist/
+/dist-newstyle/
+*.swp
+.stack-work/
+cabal.project.local
+cabal.project.local~
+*.lock

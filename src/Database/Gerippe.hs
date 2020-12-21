@@ -80,6 +80,9 @@ type ToBackEq a = (ToBack a, PersistEntityBackend a ~ SqlBackend)
 getAll :: (ToBackEq a, MonadIO m) => SqlPersistT m [Entity a]
 getAll = select . from $ pure
 
+getAllValues :: (ToBackEq a, MonadIO m) => SqlPersistT m [a]
+getAllValues = map entityVal <$> getAll
+
 -- | convenience function for simple queries with one where-clause
 -- @
 --   [johnDoe@(Entity key ent)] <- getWhere PersonName "John Doe"
