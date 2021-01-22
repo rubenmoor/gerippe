@@ -1,7 +1,6 @@
 { mkDerivation, base, containers, esqueleto, persistent, stdenv
 , transformers
 }:
-with (import <nixpkgs> {}).pkgs;
 mkDerivation {
   pname = "gerippe";
   version = "0.1.0.0";
