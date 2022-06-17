@@ -2,22 +2,45 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
+{-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 
 module Database.Gerippe
-  ( module Database.Gerippe
-  , module Database.Gerippe.Utils
-  , module Database.Esqueleto
-  , delete
-  ) where
+    ( module Database.Gerippe
+    , module Database.Gerippe.Utils
+    , module Database.Esqueleto.Legacy
+    , delete
+    ) where
 
-import           Control.Monad.IO.Class (MonadIO)
-import           Data.Map               (Map)
-import qualified Data.Map               as Map
+import           Control.Monad.IO.Class         ( MonadIO )
+import           Data.Map                       ( Map )
+import qualified Data.Map                      as Map
 
-import           Database.Esqueleto     hiding (delete, entityId)
-import           Database.Persist       (delete)
+import           Database.Esqueleto.Legacy      ( (==.)
+                                                , Entity(entityKey, entityVal)
+                                                , InnerJoin(InnerJoin)
+                                                , PersistEntity
+                                                    ( EntityField
+                                                    , Key
+                                                    , PersistEntityBackend
+                                                    )
+                                                , PersistField
+                                                , PersistStoreRead(get)
+                                                , SqlBackend
+                                                , SqlPersistT
+                                                , ToBackendKey
+                                                , (^.)
+                                                , from
+                                                , fromSqlKey
+                                                , on
+                                                , select
+                                                , toSqlKey
+                                                , val
+                                                , where_
+                                                )
+import           Database.Persist               ( delete )
 
-import           Database.Gerippe.Utils (collectSnd)
+import           Database.Gerippe.Utils         ( collectSnd )
 
 -- $example usage
 --
@@ -66,8 +89,7 @@ entityId = keyToId . entityKey
 --     Just person -> personName person -- type inference
 --     Nothing     -> "Not found"
 -- @
-getById :: (ToBack b, MonadIO m, Integral a)
-        => a -> SqlPersistT m (Maybe b)
+getById :: (ToBack b, MonadIO m, Integral a) => a -> SqlPersistT m (Maybe b)
 getById = get . toSqlKey . fromIntegral
 
 type ToBackEq a = (ToBack a, PersistEntityBackend a ~ SqlBackend)
@@ -87,8 +109,11 @@ getAllValues = map entityVal <$> getAll
 -- @
 --   [johnDoe@(Entity key ent)] <- getWhere PersonName "John Doe"
 -- @
-getWhere :: (ToBackEq a,  PersistField b, MonadIO m)
-         => EntityField a b -> b -> SqlPersistT m [Entity a]
+getWhere
+    :: (ToBackEq a, PersistField b, MonadIO m)
+    => EntityField a b
+    -> b
+    -> SqlPersistT m [Entity a]
 getWhere field value = select . from $ \t -> do
     where_ $ t ^. field ==. val value
     pure t
@@ -106,34 +131,36 @@ type EntEqs a b = (EntEq a, EntEq b)
 --   -- inner join, no jane
 --   -- Nothing
 -- @
-join1ToM :: (EntEqs a b, MonadIO m, Ord a)
-         => EntityField a (Key a)
-         -> EntityField b (Key a)
-         -> SqlPersistT m (Map (Entity a) [Entity b])
+join1ToM
+    :: (EntEqs a b, MonadIO m, Ord a)
+    => EntityField a (Key a)
+    -> EntityField b (Key a)
+    -> SqlPersistT m (Map (Entity a) [Entity b])
 join1ToM = (fmap collectSnd .) . join1ToM'
 
 -- | join a one-to-many relationship and get all entities
 -- @
 --   [(johnDoe, blogpost1), (johnDoe, blogpost2)] -- no map
 -- @
-join1ToM' :: (EntEqs a b, MonadIO m)
-          => EntityField a (Key a)
-          -> EntityField b (Key a)
-          -> SqlPersistT m [(Entity a, Entity b)]
-join1ToM' idField fkField =
-    select . from $ \(t1 `InnerJoin` t2) -> do
-        on (t1 ^. idField ==. t2 ^. fkField)
-        pure (t1, t2)
+join1ToM'
+    :: (EntEqs a b, MonadIO m)
+    => EntityField a (Key a)
+    -> EntityField b (Key a)
+    -> SqlPersistT m [(Entity a, Entity b)]
+join1ToM' idField fkField = select . from $ \(t1 `InnerJoin` t2) -> do
+    on (t1 ^. idField ==. t2 ^. fkField)
+    pure (t1, t2)
 
 -- | join a one-to-many relationship and get all entities
 -- where the first field is restricted by a where-clause
 -- and the second field is collected as list of values in a map
-join1ToMWhere :: (EntEqs a b, PersistField c, MonadIO m, Ord a)
-              => EntityField a (Key a)
-              -> EntityField b (Key a)
-              -> EntityField a c
-              -> c
-              -> SqlPersistT m (Map (Entity a) [Entity b])
+join1ToMWhere
+    :: (EntEqs a b, PersistField c, MonadIO m, Ord a)
+    => EntityField a (Key a)
+    -> EntityField b (Key a)
+    -> EntityField a c
+    -> c
+    -> SqlPersistT m (Map (Entity a) [Entity b])
 join1ToMWhere idField fkField field value =
     collectSnd <$> join1ToMWhere' idField fkField field value
 
@@ -141,15 +168,16 @@ join1ToMWhere idField fkField field value =
 -- @
 --   [(johnDoe, blogpost1), (johnDoe, blogpost2)] -- no map
 -- @
-join1ToMWhere' :: (EntEqs a b, PersistField c, MonadIO m)
-               => EntityField a (Key a)
-               -> EntityField b (Key a)
-               -> EntityField a c
-               -> c
-               -> SqlPersistT m [(Entity a, Entity b)]
+join1ToMWhere'
+    :: (EntEqs a b, PersistField c, MonadIO m)
+    => EntityField a (Key a)
+    -> EntityField b (Key a)
+    -> EntityField a c
+    -> c
+    -> SqlPersistT m [(Entity a, Entity b)]
 join1ToMWhere' idField fkField field value =
     select . from $ \(t1 `InnerJoin` t2) -> do
-        on     $ t1 ^. idField ==. t2 ^. fkField
+        on $ t1 ^. idField ==. t2 ^. fkField
         where_ $ t1 ^. field ==. val value
         pure (t1, t2)
 
@@ -160,21 +188,22 @@ join1ToMWhere' idField fkField field value =
 --   liftIO . print $ Map.lookup blogpost1 blogPostMap -- johnDoe
 --   liftIO . print $ Map.lookup blogpost2 blogPostMap -- johnDoe
 -- @
-joinMTo1 :: (EntEqs a b, MonadIO m, Ord a)
-         => EntityField a (Key b)
-         -> EntityField b (Key b)
-         -> SqlPersistT m (Map (Entity a) (Entity b))
+joinMTo1
+    :: (EntEqs a b, MonadIO m, Ord a)
+    => EntityField a (Key b)
+    -> EntityField b (Key b)
+    -> SqlPersistT m (Map (Entity a) (Entity b))
 joinMTo1 = (fmap Map.fromList .) . joinMTo1'
 
 -- | join a many-to-one relationship and get all entities
-joinMTo1' :: (EntEqs a b, MonadIO m)
-          => EntityField a (Key b)
-          -> EntityField b (Key b)
-          -> SqlPersistT m [(Entity a, Entity b)]
-joinMTo1' fkField idField =
-    select . from $ \(t1 `InnerJoin` t2) -> do
-        on (t1 ^. fkField ==. t2 ^. idField)
-        pure (t1, t2)
+joinMTo1'
+    :: (EntEqs a b, MonadIO m)
+    => EntityField a (Key b)
+    -> EntityField b (Key b)
+    -> SqlPersistT m [(Entity a, Entity b)]
+joinMTo1' fkField idField = select . from $ \(t1 `InnerJoin` t2) -> do
+    on (t1 ^. fkField ==. t2 ^. idField)
+    pure (t1, t2)
 
 -- | join a many-to-one relationship and query
 -- where the first field is restricted by a where-clause
@@ -185,45 +214,50 @@ joinMTo1' fkField idField =
 --                                BlogPostTitle
 --                                "My fr1st p0st"
 -- @
-joinMTo1Where :: (EntEqs a b, PersistField c, MonadIO m, Ord a)
-              => EntityField a (Key b)
-              -> EntityField b (Key b)
-              -> EntityField a c
-              -> c
-              -> SqlPersistT m (Map (Entity a) (Entity b))
-joinMTo1Where fkField idField = (fmap Map.fromList .) . joinMTo1Where' fkField idField
+joinMTo1Where
+    :: (EntEqs a b, PersistField c, MonadIO m, Ord a)
+    => EntityField a (Key b)
+    -> EntityField b (Key b)
+    -> EntityField a c
+    -> c
+    -> SqlPersistT m (Map (Entity a) (Entity b))
+joinMTo1Where fkField idField =
+    (fmap Map.fromList .) . joinMTo1Where' fkField idField
 
 -- | join a many-to-one relationship and query with where-clause
-joinMTo1Where' :: (EntEqs a b, PersistField c, MonadIO m)
-               => EntityField a (Key b)
-               -> EntityField b (Key b)
-               -> EntityField a c
-               -> c
-               -> SqlPersistT m [(Entity a, Entity b)]
+joinMTo1Where'
+    :: (EntEqs a b, PersistField c, MonadIO m)
+    => EntityField a (Key b)
+    -> EntityField b (Key b)
+    -> EntityField a c
+    -> c
+    -> SqlPersistT m [(Entity a, Entity b)]
 joinMTo1Where' fkField idField field value =
     select . from $ \(t1 `InnerJoin` t2) -> do
-        on     $ t1 ^. fkField ==. t2 ^. idField
-        where_ $ t1 ^. field   ==. val value
+        on $ t1 ^. fkField ==. t2 ^. idField
+        where_ $ t1 ^. field ==. val value
         pure (t1, t2)
 
 -- | join a many-to-many relationship
 -- where the second field is collected as list of values in a map
-joinMToM :: (EntEq a, EntEq b, EntEq c, MonadIO m, Ord a)
-         => EntityField a (Key a)
-         -> EntityField c (Key a)
-         -> EntityField c (Key b)
-         -> EntityField b (Key b)
-         -> SqlPersistT m (Map (Entity a) [Entity b])
+joinMToM
+    :: (EntEq a, EntEq b, EntEq c, MonadIO m, Ord a)
+    => EntityField a (Key a)
+    -> EntityField c (Key a)
+    -> EntityField c (Key b)
+    -> EntityField b (Key b)
+    -> SqlPersistT m (Map (Entity a) [Entity b])
 joinMToM idField1 fkField1 fkField2 idField2 =
     collectSnd <$> joinMToM' idField1 fkField1 fkField2 idField2
 
 -- | join a many-to-many relationship
-joinMToM' :: (EntEq a, EntEq b, EntEq c, MonadIO m)
-          => EntityField a (Key a)
-          -> EntityField c (Key a)
-          -> EntityField c (Key b)
-          -> EntityField b (Key b)
-          -> SqlPersistT m [(Entity a, Entity b)]
+joinMToM'
+    :: (EntEq a, EntEq b, EntEq c, MonadIO m)
+    => EntityField a (Key a)
+    -> EntityField c (Key a)
+    -> EntityField c (Key b)
+    -> EntityField b (Key b)
+    -> SqlPersistT m [(Entity a, Entity b)]
 joinMToM' idField1 fkField1 fkField2 idField2 =
     select . from $ \(t1 `InnerJoin` m2m `InnerJoin` t2) -> do
         on $ t2 ^. idField2 ==. m2m ^. fkField2
@@ -232,30 +266,33 @@ joinMToM' idField1 fkField1 fkField2 idField2 =
 
 -- | join a many-to-many relationship
 -- where the first field is restricted by a where-clause
-joinMToMWhere :: (EntEq a, EntEq b, EntEq c, PersistField d, MonadIO m, Ord a)
-          => EntityField a (Key a)
-          -> EntityField c (Key a)
-          -> EntityField c (Key b)
-          -> EntityField b (Key b)
-          -> EntityField a d
-          -> d
-          -> SqlPersistT m (Map (Entity a) [Entity b])
+joinMToMWhere
+    :: (EntEq a, EntEq b, EntEq c, PersistField d, MonadIO m, Ord a)
+    => EntityField a (Key a)
+    -> EntityField c (Key a)
+    -> EntityField c (Key b)
+    -> EntityField b (Key b)
+    -> EntityField a d
+    -> d
+    -> SqlPersistT m (Map (Entity a) [Entity b])
 joinMToMWhere idField1 fkField1 fkField2 idField2 field value =
-    collectSnd <$> joinMToMWhere' idField1 fkField1 fkField2 idField2 field value
+    collectSnd
+        <$> joinMToMWhere' idField1 fkField1 fkField2 idField2 field value
 
 -- | join a many-to-many relationship
 -- where the first field is restricted by a where-clause
-joinMToMWhere' :: (EntEq a, EntEq b, EntEq c, PersistField d, MonadIO m)
-          => EntityField a (Key a)
-          -> EntityField c (Key a)
-          -> EntityField c (Key b)
-          -> EntityField b (Key b)
-          -> EntityField a d
-          -> d
-          -> SqlPersistT m [(Entity a, Entity b)]
+joinMToMWhere'
+    :: (EntEq a, EntEq b, EntEq c, PersistField d, MonadIO m)
+    => EntityField a (Key a)
+    -> EntityField c (Key a)
+    -> EntityField c (Key b)
+    -> EntityField b (Key b)
+    -> EntityField a d
+    -> d
+    -> SqlPersistT m [(Entity a, Entity b)]
 joinMToMWhere' idField1 fkField1 fkField2 idField2 field value =
     select . from $ \(t1 `InnerJoin` m2m `InnerJoin` t2) -> do
-        on     $ t2 ^. idField2 ==. m2m ^. fkField2
-        on     $ m2m ^. fkField1 ==. t1 ^. idField1
+        on $ t2 ^. idField2 ==. m2m ^. fkField2
+        on $ m2m ^. fkField1 ==. t1 ^. idField1
         where_ $ t1 ^. field ==. val value
         pure (t1, t2)
