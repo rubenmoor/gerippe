@@ -16,28 +16,7 @@ import           Control.Monad.IO.Class         ( MonadIO )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 
-import           Database.Esqueleto.Legacy      ( (==.)
-                                                , Entity(entityKey, entityVal)
-                                                , InnerJoin(InnerJoin)
-                                                , PersistEntity
-                                                    ( EntityField
-                                                    , Key
-                                                    , PersistEntityBackend
-                                                    )
-                                                , PersistField
-                                                , PersistStoreRead(get)
-                                                , SqlBackend
-                                                , SqlPersistT
-                                                , ToBackendKey
-                                                , (^.)
-                                                , from
-                                                , fromSqlKey
-                                                , on
-                                                , select
-                                                , toSqlKey
-                                                , val
-                                                , where_
-                                                )
+import           Database.Esqueleto.Legacy      hiding (delete)
 import           Database.Persist               ( delete )
 
 import           Database.Gerippe.Utils         ( collectSnd )

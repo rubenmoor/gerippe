@@ -7,6 +7,11 @@ let
         packages = pkgs.haskell.packages // {
           "${compiler}" = pkgs.haskell.packages."${compiler}".override {
             overrides = self: super: {
+              mkDerivation = args: super.mkDerivation ( args // {
+                doCheck = false;
+                doHaddock = false;
+                enableLibraryProfiling = false;
+              });
             };
           };
         };
