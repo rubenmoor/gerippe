@@ -2,8 +2,8 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# OPTIONS_GHC -Wno-deferred-out-of-scope-variables #-}
-{-# OPTIONS_GHC -Wno-deferred-type-errors #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Database.Gerippe
     ( module Database.Gerippe
@@ -15,7 +15,7 @@ module Database.Gerippe
 import           Control.Monad.IO.Class         ( MonadIO )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-
+import qualified Database.Esqueleto.Experimental as Esqueleto
 import           Database.Esqueleto.Legacy      hiding (delete)
 import           Database.Persist               ( delete )
 
@@ -79,7 +79,7 @@ type ToBackEq a = (ToBack a, PersistEntityBackend a ~ SqlBackend)
 --   liftIO . putStrLn . unwords $ map personName persons
 -- @
 getAll :: (ToBackEq a, MonadIO m) => SqlPersistT m [Entity a]
-getAll = select . from $ pure
+getAll = select $ from pure
 
 getAllValues :: (ToBackEq a, MonadIO m) => SqlPersistT m [a]
 getAllValues = map entityVal <$> getAll
@@ -96,6 +96,15 @@ getWhere
 getWhere field value = select . from $ \t -> do
     where_ $ t ^. field ==. val value
     pure t
+
+deleteAll
+  :: forall a m
+  . ( MonadIO m
+    , PersistEntity a
+    , ToBackEq a
+    )
+  => SqlPersistT m ()
+deleteAll = Esqueleto.delete $ from $ \(a :: SqlExpr (Entity a)) -> pure ()
 
 type EntEq a = (PersistEntity a, PersistEntityBackend a ~ SqlBackend)
 type EntEqs a b = (EntEq a, EntEq b)
